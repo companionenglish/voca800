@@ -1,0 +1,7 @@
+# Vercel 배포에서 빼는 파일 — 로컬 개발용이라 웹에 올릴 필요가 없어요
+server.py
+tools/
+.env*
+*.pdf
+.claude/
+__pycache__/

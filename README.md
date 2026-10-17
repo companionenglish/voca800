@@ -18,6 +18,16 @@ python3 server.py            # http://localhost:5173
 
 `server.py`는 정적 파일을 내보내고 `/api/photos`로 Unsplash 검색을 대신해 줘요. 키는 서버에서만 읽고 브라우저로 보내지 않으며, `.env*` 파일은 웹으로 열리지 않아요. 키가 없어도 사진만 빠진 채로 동작해요.
 
+## 배포 (Vercel)
+
+GitHub 저장소를 Vercel에 연결하면 `main`에 푸시할 때마다 자동 배포돼요.
+
+1. Vercel에서 **Add New → Project**로 이 저장소를 가져와요 (Framework Preset: **Other**, 빌드 설정은 비워 둬요).
+2. **Environment Variables**에 `UNSPLASH_ACCESS_KEY`를 추가해요.
+3. 배포하면 정적 파일은 그대로 나가고, `api/photos.py`가 `/api/photos` 서버리스 함수로 돌아가요.
+
+`server.py`·`tools/`·`.env*`는 `.vercelignore`로 배포에서 빠져요. 검색 결과는 Vercel CDN에 하루 캐시돼서 같은 단어는 Unsplash 요청 한도를 다시 쓰지 않아요.
+
 ## 발음 다시 만들기
 
 ```bash
@@ -33,6 +43,7 @@ python3 tools/make_audio.py en-US-AnaNeural --force   # 목소리 목록: edge-t
 | `js/words.js` | 단어 800개 `[단어, 뜻]` |
 | `assets/stickers/` | 캐릭터 스티커 (WebP) |
 | `audio/` | 단어별 발음 `001.mp3`–`800.mp3` |
-| `server.py` | 개발 서버 + Unsplash 프록시 |
+| `api/photos.py` | Unsplash 검색 (Vercel 함수 · 로컬 서버 공용) |
+| `server.py` | 로컬 개발 서버 |
 
 사진: [Unsplash](https://unsplash.com/?utm_source=voca800&utm_medium=referral) — 각 사진에 작가를 표기해요.

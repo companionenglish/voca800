@@ -1,4 +1,5 @@
-"""보카800 개발 서버 — 정적 파일 + Unsplash 사진 검색 프록시 (파이썬 표준 라이브러리만 사용)
+"""보카800 로컬 개발 서버 — 정적 파일 + Unsplash 사진 검색 (파이썬 표준 라이브러리만 사용)
+배포(Vercel)에서는 이 파일 대신 api/photos.py가 서버리스 함수로 돌아가요.
 
     python3 server.py            # http://localhost:5173
 
@@ -9,20 +10,16 @@
 """
 import json
 import os
-import time
-import urllib.error
 import urllib.parse
-import urllib.request
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
+
+from api.photos import photos_response  # Vercel 함수와 같은 코드를 써요
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
 PORT = int(os.environ.get("PORT", "5173"))
 ENV_FILES = (".env.local", ".env")  # 앞의 파일이 우선
-BLOCKED_PREFIXES = ("tools/",)
+BLOCKED_PREFIXES = ("tools/", "api/")
 BLOCKED_FILES = {"server.py"}
-UTM = "utm_source=voca800&utm_medium=referral"  # Unsplash 출처 표기 링크 규칙
-CACHE_TTL = 60 * 60
-_cache = {}
 
 
 def read_env_file(path):
@@ -54,48 +51,6 @@ def get_env(name):
     return ""
 
 
-def search_unsplash(query, per_page):
-    key = get_env("UNSPLASH_ACCESS_KEY")
-    if not key:
-        return 503, {"error": "UNSPLASH_ACCESS_KEY가 설정되지 않았어요. .env.local에 값을 넣어 주세요."}
-
-    cache_key = (query.lower(), per_page)
-    hit = _cache.get(cache_key)
-    if hit and time.time() - hit[0] < CACHE_TTL:
-        return 200, hit[1]
-
-    url = "https://api.unsplash.com/search/photos?" + urllib.parse.urlencode(
-        {"query": query, "per_page": per_page, "content_filter": "high", "orientation": "landscape"}
-    )
-    req = urllib.request.Request(url, headers={"Authorization": f"Client-ID {key}", "Accept-Version": "v1"})
-    try:
-        with urllib.request.urlopen(req, timeout=10) as res:
-            data = json.load(res)
-    except urllib.error.HTTPError as e:
-        msg = {401: "Unsplash 키가 올바르지 않아요.", 403: "Unsplash 요청 한도를 넘었거나 권한이 없어요."}.get(e.code, "Unsplash 요청에 실패했어요.")
-        return e.code, {"error": msg}
-    except (urllib.error.URLError, TimeoutError):
-        return 502, {"error": "Unsplash에 연결하지 못했어요."}
-
-    # 브라우저에 필요한 필드만 넘겨요 (출처 표기용 작가 정보 포함)
-    photos = [
-        {
-            "id": p["id"],
-            "alt": p.get("alt_description") or p.get("description") or query,
-            "color": p.get("color"),
-            "thumb": p["urls"]["small"],
-            "regular": p["urls"]["regular"],
-            "link": f'{p["links"]["html"]}?{UTM}',
-            "author": p["user"]["name"],
-            "authorLink": f'{p["user"]["links"]["html"]}?{UTM}',
-        }
-        for p in data.get("results", [])
-    ]
-    body = {"query": query, "photos": photos, "unsplashLink": f"https://unsplash.com/?{UTM}"}
-    _cache[cache_key] = (time.time(), body)
-    return 200, body
-
-
 class Handler(SimpleHTTPRequestHandler):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, directory=ROOT, **kwargs)
@@ -122,15 +77,7 @@ class Handler(SimpleHTTPRequestHandler):
     def do_GET(self):
         u = urllib.parse.urlparse(self.path)
         if u.path == "/api/photos":
-            q = urllib.parse.parse_qs(u.query)
-            query = (q.get("query") or [""])[0].strip()[:60]
-            if not query:
-                return self.send_json(400, {"error": "query가 필요해요."})
-            try:
-                per_page = max(1, min(30, int((q.get("per_page") or ["6"])[0])))
-            except ValueError:
-                per_page = 6
-            return self.send_json(*search_unsplash(query, per_page))
+            return self.send_json(*photos_response(u.query, get_env("UNSPLASH_ACCESS_KEY")))
         if u.path.startswith("/api/"):
             return self.send_json(404, {"error": "없는 API예요."})
         if self.is_blocked(u.path):
