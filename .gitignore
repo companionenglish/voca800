@@ -1,0 +1,14 @@
+# 비밀 값 — 커밋하지 않아요 (.env.example 은 공유용이라 포함)
+.env
+.env.*
+!.env.example
+
+# OS / 도구
+.DS_Store
+__pycache__/
+
+# 원본 PDF — 단어 데이터는 js/words.js에 있어요 (레이아웃 저작권 때문에 로컬에만 보관)
+*.pdf
+
+# 로컬 도구 설정
+.claude/
